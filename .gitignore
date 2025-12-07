@@ -1,1 +1,22 @@
+# Env files
 .env
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+main
+main.exe
+
+# Go build cache
+/build
+/bin
+/tmp
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
