@@ -1,4 +1,4 @@
-package middleware
+package ratelimiter
 
 import (
 	"context"
@@ -6,53 +6,53 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"authService/internal/utils"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
-func RateLimiter(rdb *redis.Client) func(http.Handler) http.Handler {
+func RateLimiter(rdb *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
 
-	return func(next http.Handler) http.Handler {
+		ctx := context.Background()
 
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1. Extract IP
+		ip := utils.GetIP(c.Request)
+		if ip == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Unable to get IP"})
+			c.Abort()
+			return
+		}
 
-			ctx := context.Background()
+		fmt.Println("Client IP:", ip)
 
-			// 1️⃣ Extract IP
-			ip := utils.GetIP(r)
-			if ip == "" {
-				http.Error(w, "Unable to get IP", http.StatusForbidden)
-				return
-			}
+		key := "rate_limit:" + ip
 
-			fmt.Println("Client IP:", ip) // For testing
+		// 2. Check if entry exists
+		exists, err := rdb.Exists(ctx, key).Result()
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Redis error"})
+			c.Abort()
+			return
+		}
 
-			// 2️⃣ Create Redis entry if not exists
-			key := "rate_limit:" + ip
+		if exists == 0 {
+			// Create entry
+			err := rdb.HSet(ctx, key, map[string]interface{}{
+				"tokens":         10,
+				"last_refill_ts": time.Now().Unix(),
+			}).Err()
 
-			exists, err := rdb.Exists(ctx, key).Result()
 			if err != nil {
-				http.Error(w, "Redis error", 500)
+				c.JSON(500, gin.H{"error": "Redis write error"})
+				c.Abort()
 				return
 			}
+			fmt.Println("Created redis entry for:", ip)
+		}
 
-			if exists == 0 {
-				// Key does not exist → create it
-				err := rdb.HSet(ctx, key, map[string]interface{}{
-					"tokens":         10,                // initial tokens
-					"last_refill_ts": time.Now().Unix(), // timestamp
-				}).Err()
-				if err != nil {
-					http.Error(w, "Redis set error", 500)
-					return
-				}
-
-				fmt.Println("Redis entry created for IP:", ip)
-			} else {
-				fmt.Println("Redis entry already exists for IP:", ip)
-			}
-
-			next.ServeHTTP(w, r)
-		})
+		// Continue to next handler
+		c.Next()
 	}
 }

@@ -2,22 +2,27 @@ package main
 
 import (
 	"log"
-	"net/http"
+
 	"authService/config"
+	"authService/internal/routes"
 	"authService/internal/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Connect to Redis once
+	// Connect to Redis (global singleton)
 	config.ConnectRedis()
 
-	mux := http.NewServeMux()
+	// Create Gin router instance
+	r := gin.Default()
 
-	// Pass global RDB to middleware
-	mux.Handle("/test", middleware.RateLimiter(config.RDB)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	})))
+	// Apply global middleware (if you want)
+	r.Use(ratelimiter.RateLimiter(config.RDB))
 
-	log.Println("Server running on :8080")
-	http.ListenAndServe(":8080", mux)
+	// Register routes
+	routes.AuthRoutes(r)
+
+	log.Println("🚀 Server running on :8080")
+	r.Run(":8080")
 }
