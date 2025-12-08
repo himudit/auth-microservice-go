@@ -29,14 +29,10 @@ func RateLimiter(rdb *redis.Client) gin.HandlerFunc {
 		key := "rate_limit:" + ip
 		ctx := context.Background()
 
-		// ----------------------------
-		// 1. Fetch existing redis entry
-		// ----------------------------
 		val, err := rdb.HGetAll(ctx, key).Result()
 
 		var data RateLimiterData
 
-		// If key does NOT exist -> initialize
 		if err != nil || len(val) == 0 {
 			data = RateLimiterData{
 				Tokens:       10, // max tokens
@@ -47,9 +43,6 @@ func RateLimiter(rdb *redis.Client) gin.HandlerFunc {
 			data.LastRefillTs, _ = strconv.ParseInt(val["last_refill_ts"], 10, 64)
 		}
 
-		// ----------------------------
-		// 2. Refill calculation
-		// ----------------------------
 		currentTime := time.Now().Unix()
 		newTokens := float64(currentTime-data.LastRefillTs) / 6.0
 		if newTokens > 0 {
@@ -59,30 +52,20 @@ func RateLimiter(rdb *redis.Client) gin.HandlerFunc {
 			}
 		}
 
-		// ----------------------------
-		// 3. Check if tokens are available
-		// ----------------------------
 		if data.Tokens < 1 {
 			c.JSON(429, gin.H{"error": "Rate limit exceeded"})
 			c.Abort()
 			return
 		}
 
-		// ----------------------------
-		// 4. Deduct 1 token
-		// ----------------------------
 		data.Tokens -= 1
 		data.LastRefillTs = currentTime
 
-		// ----------------------------
-		// 5. Save back to Redis
-		// ----------------------------
 		rdb.HSet(ctx, key, map[string]interface{}{
 			"tokens":         data.Tokens,
 			"last_refill_ts": data.LastRefillTs,
 		})
 
-		// Continue request
 		c.Next()
 
 	}

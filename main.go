@@ -12,19 +12,14 @@ import (
 )
 
 func main() {
-	// Connect Redis
 	config.ConnectRedis()
 
-	// Create Gin router
 	r := gin.Default()
 
-	// Global rate limiter middleware
 	r.Use(ratelimiter.RateLimiter(config.RDB))
 
-	// Initialize controller
 	authController := controllers.NewAuthController()
 
-	// Register routes
 	routes.AuthRoutes(r, authController)
 
 	log.Println("🚀 Server running on :8080")
