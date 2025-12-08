@@ -2,8 +2,8 @@ package ratelimiter
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"authService/internal/utils"
@@ -12,47 +12,78 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type RateLimiterData struct {
+	Tokens       float64 `json:"tokens"`
+	LastRefillTs int64   `json:"last_refill_ts"`
+}
+
 func RateLimiter(rdb *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		ctx := context.Background()
-
-		// 1. Extract IP
 		ip := utils.GetIP(c.Request)
 		if ip == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Unable to get IP"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unable to identify IP"})
 			c.Abort()
 			return
 		}
-
-		fmt.Println("Client IP:", ip)
-
 		key := "rate_limit:" + ip
+		ctx := context.Background()
 
-		// 2. Check if entry exists
-		exists, err := rdb.Exists(ctx, key).Result()
-		if err != nil {
-			c.JSON(500, gin.H{"error": "Redis error"})
+		// ----------------------------
+		// 1. Fetch existing redis entry
+		// ----------------------------
+		val, err := rdb.HGetAll(ctx, key).Result()
+
+		var data RateLimiterData
+
+		// If key does NOT exist -> initialize
+		if err != nil || len(val) == 0 {
+			data = RateLimiterData{
+				Tokens:       10, // max tokens
+				LastRefillTs: time.Now().Unix(),
+			}
+		} else {
+			data.Tokens, _ = strconv.ParseFloat(val["tokens"], 64)
+			data.LastRefillTs, _ = strconv.ParseInt(val["last_refill_ts"], 10, 64)
+		}
+
+		// ----------------------------
+		// 2. Refill calculation
+		// ----------------------------
+		currentTime := time.Now().Unix()
+		newTokens := float64(currentTime-data.LastRefillTs) / 6.0
+		if newTokens > 0 {
+			data.Tokens += newTokens
+			if data.Tokens > 10 { // cap tokens
+				data.Tokens = 10
+			}
+		}
+
+		// ----------------------------
+		// 3. Check if tokens are available
+		// ----------------------------
+		if data.Tokens < 1 {
+			c.JSON(429, gin.H{"error": "Rate limit exceeded"})
 			c.Abort()
 			return
 		}
 
-		if exists == 0 {
-			// Create entry
-			err := rdb.HSet(ctx, key, map[string]interface{}{
-				"tokens":         10,
-				"last_refill_ts": time.Now().Unix(),
-			}).Err()
+		// ----------------------------
+		// 4. Deduct 1 token
+		// ----------------------------
+		data.Tokens -= 1
+		data.LastRefillTs = currentTime
 
-			if err != nil {
-				c.JSON(500, gin.H{"error": "Redis write error"})
-				c.Abort()
-				return
-			}
-			fmt.Println("Created redis entry for:", ip)
-		}
+		// ----------------------------
+		// 5. Save back to Redis
+		// ----------------------------
+		rdb.HSet(ctx, key, map[string]interface{}{
+			"tokens":         data.Tokens,
+			"last_refill_ts": data.LastRefillTs,
+		})
 
-		// Continue to next handler
+		// Continue request
 		c.Next()
+
 	}
 }
