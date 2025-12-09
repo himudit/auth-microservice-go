@@ -7,6 +7,7 @@ import (
 	"authService/internal/controllers"
 	ratelimiter "authService/internal/middlewares"
 	"authService/internal/routes"
+	"authService/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -19,6 +20,8 @@ func main() {
 	}
 	config.ConnectRedis()
 	config.ConnectMongo()
+	services.InitCollections()
+	config.LoadRSAKeys()
 
 	r := gin.Default()
 

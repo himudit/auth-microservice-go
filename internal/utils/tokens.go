@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"time"
 
 	"authService/config"
@@ -14,17 +15,19 @@ const (
 )
 
 type JWTClaims struct {
-	UserID string `json:"userId"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID       string `json:"userId"`
+	Email        string `json:"email"`
+	Role         string `json:"role"`
+	TokenVersion int    `json:"tokenVersion"`
 	jwt.RegisteredClaims
 }
 
-func GenerateAccessToken(userId, email, role string) (string, error) {
+func GenerateAccessToken(userId, email, role string, tokenVersion int) (string, error) {
 	claims := &JWTClaims{
-		UserID: userId,
-		Email:  email,
-		Role:   role,
+		UserID:       userId,
+		Email:        email,
+		Role:         role,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -36,11 +39,15 @@ func GenerateAccessToken(userId, email, role string) (string, error) {
 	return token.SignedString(config.PrivateKey)
 }
 
-func GenerateRefreshToken(userId string) (string, error) {
-	claims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(RefreshTokenExpiry)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Subject:   userId,
+func GenerateRefreshToken(userId string, tokenVersion int) (string, error) {
+	claims := JWTClaims{
+		UserID:       userId,
+		TokenVersion: tokenVersion,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(RefreshTokenExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   userId,
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
