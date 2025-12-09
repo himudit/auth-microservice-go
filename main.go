@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"authService/config"
 	"authService/internal/controllers"
@@ -18,7 +17,6 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️ No .env file found, using system environment")
 	}
-	log.Println("MONGO_URI:", os.Getenv("MONGO_URI"))
 	config.ConnectRedis()
 	config.ConnectMongo()
 

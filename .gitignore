@@ -20,3 +20,8 @@ main.exe
 
 # Logs
 *.log
+
+# Ignore JWT RSA keys
+config/private.pem
+config/public.pem
+*.pem
