@@ -71,7 +71,8 @@ func UpdateBackoff(email string, rdb *redis.Client) error {
 	if err != nil {
 		return err
 	}
-	return rdb.Set(ctx, key, jsonData, 0).Err()
+	ttl := 15 * time.Minute
+	return rdb.Set(ctx, key, jsonData, ttl).Err()
 }
 
 func ResetBackoff(email string, rdb *redis.Client) {
