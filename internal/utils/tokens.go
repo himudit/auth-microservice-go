@@ -73,10 +73,10 @@ func VerifyAccessToken(tokenString string) (*JWTClaims, error) {
 	return claims, nil
 }
 
-func VerifyRefreshToken(tokenString string) (*jwt.RegisteredClaims, error) {
+func VerifyRefreshToken(tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenString,
-		&jwt.RegisteredClaims{},
+		&JWTClaims{},
 		func(t *jwt.Token) (interface{}, error) {
 			return config.PublicKey, nil
 		},
@@ -86,7 +86,7 @@ func VerifyRefreshToken(tokenString string) (*jwt.RegisteredClaims, error) {
 		return nil, err
 	}
 
-	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	claims, ok := token.Claims.(*JWTClaims)
 	if !ok || !token.Valid {
 		return nil, jwt.ErrTokenInvalidClaims
 	}

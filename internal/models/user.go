@@ -51,3 +51,43 @@ func GetUserByEmail(email string) (*User, error) {
 	}
 	return &user, nil
 }
+
+func GetUserByID(id string) (*User, error) {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+
+	var user User
+	err = userCollection.FindOne(
+		context.TODO(),
+		bson.M{"_id": objectID},
+	).Decode(&user)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func IncrementTokenVersion(userID string) error {
+	// Convert string to ObjectID
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	// Increment tokenVersion
+	update := bson.M{
+		"$inc": bson.M{"token_version": 1},
+	}
+
+	_, err = userCollection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": objID},
+		update,
+	)
+
+	return err
+}
